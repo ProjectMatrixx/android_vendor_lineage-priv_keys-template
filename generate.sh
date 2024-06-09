@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-files=(
+certificates=(
     bluetooth
     cts_uicc_2021
     cyngn-app
@@ -19,61 +19,61 @@ files=(
     verity
 )
 
-apex=(
-    com.android.adbd.certificate.override
-    com.android.adservices.api.certificate.override
-    com.android.adservices.certificate.override
-    com.android.appsearch.certificate.override
-    com.android.art.certificate.override
-    com.android.bluetooth.certificate.override
-    com.android.btservices.certificate.override
-    com.android.cellbroadcast.certificate.override
-    com.android.compos.certificate.override
-    com.android.configinfrastructure.certificate.override
-    com.android.connectivity.resources.certificate.override
-    com.android.conscrypt.certificate.override
-    com.android.devicelock.certificate.override
-    com.android.extservices.certificate.override
-    com.android.graphics.pdf.certificate.override
-    com.android.hardware.biometrics.face.virtual.certificate.override
-    com.android.hardware.biometrics.fingerprint.virtual.certificate.override
-    com.android.hardware.boot.certificate.override
-    com.android.hardware.cas.certificate.override
-    com.android.hardware.wifi.certificate.override
-    com.android.healthfitness.certificate.override
-    com.android.hotspot2.osulogin.certificate.override
-    com.android.i18n.certificate.override
-    com.android.ipsec.certificate.override
-    com.android.media.certificate.override
-    com.android.mediaprovider.certificate.override
-    com.android.media.swcodec.certificate.override
-    com.android.nearby.halfsheet.certificate.override
-    com.android.networkstack.tethering.certificate.override
-    com.android.neuralnetworks.certificate.override
-    com.android.ondevicepersonalization.certificate.override
-    com.android.os.statsd.certificate.override
-    com.android.permission.certificate.override
-    com.android.resolv.certificate.override
-    com.android.rkpd.certificate.override
-    com.android.runtime.certificate.override
-    com.android.safetycenter.resources.certificate.override
-    com.android.scheduling.certificate.override
-    com.android.sdkext.certificate.override
-    com.android.support.apexer.certificate.override
-    com.android.telephony.certificate.override
-    com.android.telephonymodules.certificate.override
-    com.android.tethering.certificate.override
-    com.android.tzdata.certificate.override
-    com.android.uwb.certificate.override
-    com.android.uwb.resources.certificate.override
-    com.android.virt.certificate.override
-    com.android.vndk.current.certificate.override
-    com.android.wifi.certificate.override
-    com.android.wifi.dialog.certificate.override
-    com.android.wifi.resources.certificate.override
-    com.google.pixel.camera.hal.certificate.override
-    com.google.pixel.vibrator.hal.certificate.override
-    com.qorvo.uwb.certificate.override
+apex_certificates=(
+    com.android.adbd
+    com.android.adservices.api
+    com.android.adservices
+    com.android.appsearch
+    com.android.art
+    com.android.bluetooth
+    com.android.btservices
+    com.android.cellbroadcast
+    com.android.compos
+    com.android.configinfrastructure
+    com.android.connectivity.resources
+    com.android.conscrypt
+    com.android.devicelock
+    com.android.extservices
+    com.android.graphics.pdf
+    com.android.hardware.biometrics.face.virtual
+    com.android.hardware.biometrics.fingerprint.virtual
+    com.android.hardware.boot
+    com.android.hardware.cas
+    com.android.hardware.wifi
+    com.android.healthfitness
+    com.android.hotspot2.osulogin
+    com.android.i18n
+    com.android.ipsec
+    com.android.media
+    com.android.mediaprovider
+    com.android.media.swcodec
+    com.android.nearby.halfsheet
+    com.android.networkstack.tethering
+    com.android.neuralnetworks
+    com.android.ondevicepersonalization
+    com.android.os.statsd
+    com.android.permission
+    com.android.resolv
+    com.android.rkpd
+    com.android.runtime
+    com.android.safetycenter.resources
+    com.android.scheduling
+    com.android.sdkext
+    com.android.support.apexer
+    com.android.telephony
+    com.android.telephonymodules
+    com.android.tethering
+    com.android.tzdata
+    com.android.uwb
+    com.android.uwb.resources
+    com.android.virt
+    com.android.vndk.current
+    com.android.wifi
+    com.android.wifi.dialog
+    com.android.wifi.resources
+    com.google.pixel.camera.hal
+    com.google.pixel.vibrator.hal
+    com.qorvo.uwb
 )
 
 confirm() {
@@ -146,16 +146,17 @@ user_input() {
     subject="/C=$country_code/ST=$state/L=$city/O=$org/OU=$ou/CN=$cn/emailAddress=$email"
 }
 
-generate_keys() {
-    echo "Generating keys..."
-    for file in "${files[@]}" "${apex[@]}"; do
-        if [[ "${files[*]}" =~ "${file}" ]]; then
+generate_certificates() {
+    echo "Generating certificates..."
+    for certificate in "${certificates[@]}" "${apex_certificates[@]}"; do
+        if [[ " ${certificates[*]} " == *" $certificate "* ]]; then
             size=$key_size
         else
             size=4096
+            certificate="$certificate.certificate.override"
         fi
         echo | bash <(sed "s/2048/$size/" ../../../development/tools/make_key) \
-            "$file" \
+            "$certificate" \
             "$subject"
     done
 }
@@ -169,12 +170,12 @@ create_symlinks() {
 
 generate_android_bp() {
     echo "Generating Android.bp..."
-    for apex_file in "${apex[@]}"; do
+    for apex_certificate in "${apex_certificates[@]}"; do
         echo "android_app_certificate {" >> Android.bp
-        echo "    name: \"$apex_file\"," >> Android.bp
-        echo "    certificate: \"$apex_file\"," >> Android.bp
+        echo "    name: \"$apex_certificate.certificate.override\"," >> Android.bp
+        echo "    certificate: \"$apex_certificate.certificate.override\"," >> Android.bp
         echo "}" >> Android.bp
-        if [[ $apex_file != "${apex[-1]}" ]]; then
+        if [[ $apex_certificate != "${apex_certificates[-1]}" ]]; then
             echo >> Android.bp
         fi
     done
@@ -183,12 +184,11 @@ generate_android_bp() {
 generate_keys_mk() {
     echo "Generating keys.mk..."
     echo "PRODUCT_CERTIFICATE_OVERRIDES := \\" > keys.mk
-    for apex_file in "${apex[@]}"; do
-        apex_name="${apex_file%.certificate.override}"
-        if [[ $apex_file != "${apex[-1]}" ]]; then
-            echo "    ${apex_name}:${apex_file} \\" >> keys.mk
+    for apex_certificate in "${apex_certificates[@]}"; do
+        if [[ $apex_certificate != "${apex_certificates[-1]}" ]]; then
+            echo "    ${apex_certificate}:${apex_certificate}.certificate.override \\" >> keys.mk
         else
-            echo "    ${apex_name}:${apex_file}" >> keys.mk
+            echo "    ${apex_certificate}:${apex_certificate}.certificate.override" >> keys.mk
         fi
     done
 
@@ -198,7 +198,7 @@ generate_keys_mk() {
 }
 
 user_input
-generate_keys
+generate_certificates
 create_symlinks
 generate_android_bp
 generate_keys_mk
