@@ -11,6 +11,7 @@ certificates=(
     cyngn-app
     media
     networkstack
+    nfc
     platform
     sdk_sandbox
     shared
