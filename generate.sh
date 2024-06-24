@@ -1,9 +1,10 @@
-#!/bin/bash
 #
 # SPDX-FileCopyrightText: 2024 The Evolution X Project
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+
+#!/bin/bash
 
 certificates=(
     bluetooth
@@ -145,25 +146,45 @@ user_input() {
     fi
 
     subject="/C=$country_code/ST=$state/L=$city/O=$org/OU=$ou/CN=$cn/emailAddress=$email"
+
+    generate_certificates
 }
 
 generate_certificates() {
     echo "Generating certificates..."
+    local generated=false
+
     for certificate in "${certificates[@]}" "${apex_certificates[@]}"; do
-        if [[ " ${certificates[*]} " == *" $certificate "* ]]; then
-            size=$key_size
+        if [[ (-f "${certificate}.x509.pem" && -f "${certificate}.pk8") ||
+              (-f "${certificate}.certificate.override.x509.pem" && -f "${certificate}.certificate.override.pk8") ]]; then
+            echo "$certificate already exists. Skipping..."
         else
-            size=4096
-            certificate="$certificate.certificate.override"
+            generated=true
+            if [[ " ${certificates[*]} " == *" $certificate "* ]]; then
+                size=$key_size
+            else
+                size=4096
+                certificate="$certificate.certificate.override"
+            fi
+            echo | bash <(sed "s/2048/$size/" ../../../development/tools/make_key) \
+                "$certificate" \
+                "$subject"
         fi
-        echo | bash <(sed "s/2048/$size/" ../../../development/tools/make_key) \
-            "$certificate" \
-            "$subject"
     done
+
+    if ! $generated; then
+        echo "No new keys were generated. Exiting..."
+        return
+    fi
+
+    create_symlinks
+    generate_android_bp
+    generate_keys_mk
 }
 
 create_symlinks() {
     echo "Creating system links..."
+    rm -f BUILD.bazel releasekey.pk8 releasekey.x509.pem
     ln -sf ../../../build/make/target/product/security/BUILD.bazel BUILD.bazel
     ln -sf testkey.pk8 releasekey.pk8
     ln -sf testkey.x509.pem releasekey.x509.pem
@@ -171,6 +192,7 @@ create_symlinks() {
 
 generate_android_bp() {
     echo "Generating Android.bp..."
+    rm -f Android.bp
     for apex_certificate in "${apex_certificates[@]}"; do
         echo "android_app_certificate {" >> Android.bp
         echo "    name: \"$apex_certificate.certificate.override\"," >> Android.bp
@@ -184,6 +206,7 @@ generate_android_bp() {
 
 generate_keys_mk() {
     echo "Generating keys.mk..."
+    rm -f keys.mk
     echo "PRODUCT_CERTIFICATE_OVERRIDES := \\" > keys.mk
     for apex_certificate in "${apex_certificates[@]}"; do
         if [[ $apex_certificate != "${apex_certificates[-1]}" ]]; then
@@ -199,11 +222,3 @@ generate_keys_mk() {
 }
 
 user_input
-generate_certificates
-create_symlinks
-generate_android_bp
-generate_keys_mk
-
-rm -rf .git
-rm README.md
-rm "$0"
